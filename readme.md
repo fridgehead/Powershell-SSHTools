@@ -14,8 +14,12 @@ Usage
 > import-module SSH-Tools.ps1
 > Start-ReversePortForward -sshhost ssh.myhost.com -username USER1 -password PASS -RemotePort 23000 -Desthost someinternalserver.local -destport 80
 
+ or to start a tunnel + socks5 proxy on port 23000
+
+> start-socksproxy -sshhost ssh.myhost.com -username USER -password PASS -RemotePort 23000 -LocalPort 10000
+
+
 when youre done
 
-> Stop-reverseportforward
+> Stop-PortForwardJobs
 
-Currently only one port forward at a time is possible, it uses the PS jobs system so I see no reason more couldnt be started, I just havent got round to it yet :)
